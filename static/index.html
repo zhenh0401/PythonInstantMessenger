@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyIM</title>
+    <style>
+        :root {
+            --bg-dark: #313338;
+            --bg-sidebar: #2b2d31;
+            --bg-chat: #313338;
+            --bg-input: #383a40;
+            --text-main: #dbdee1;
+            --text-muted: #949ba4;
+            --accent: #5865F2;
+            --accent-hover: #4752C4;
+            --danger: #da373c;
+            --border: #1e1f22;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: var(--bg-dark); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; }
+
+        /* --- AUTH SCREEN --- */
+        #auth-screen {
+            position: absolute; inset: 0; background: var(--bg-dark);
+            display: flex; align-items: center; justify-content: center; z-index: 100;
+        }
+        .auth-box {
+            background: #1e1f22; padding: 30px; border-radius: 8px; width: 400px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .auth-box h2 { text-align: center; margin-bottom: 20px; color: #fff; }
+        .auth-box input {
+            width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 4px;
+            border: none; background: #000; color: #fff; font-size: 16px;
+        }
+        .auth-box button {
+            width: 100%; padding: 10px; border: none; border-radius: 4px;
+            background: var(--accent); color: #fff; font-size: 16px; cursor: pointer;
+            font-weight: bold; margin-bottom: 10px;
+        }
+        .auth-box button:hover { background: var(--accent-hover); }
+        .auth-links { display: flex; justify-content: space-between; font-size: 14px; }
+        .auth-links a { color: var(--accent); text-decoration: none; cursor: pointer; }
+        .auth-links a:hover { text-decoration: underline; }
+        .error-msg { color: var(--danger); font-size: 14px; margin-bottom: 10px; text-align: center; min-height: 20px; }
+        .hidden { display: none !important; }
+
+        /* --- CHAT SCREEN --- */
+        #chat-screen { display: flex; width: 100%; height: 100%; }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 240px; background: var(--bg-sidebar); display: flex; flex-direction: column;
+        }
+        .sidebar-header {
+            padding: 15px; font-weight: bold; border-bottom: 1px solid var(--border);
+            color: #fff; font-size: 18px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .online-users { flex: 1; overflow-y: auto; padding: 10px; }
+        .user-item {
+            padding: 8px 10px; border-radius: 4px; cursor: pointer; margin-bottom: 4px;
+            display: flex; align-items: center; gap: 8px; font-size: 15px;
+        }
+        .user-item:hover { background: rgba(255,255,255,0.1); }
+        .user-item.active { background: rgba(255,255,255,0.15); }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #23a55a; }
+        .user-bottom { padding: 10px; background: #232428; display: flex; justify-content: space-between; align-items: center; }
+        .logout-btn { background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted); padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .logout-btn:hover { background: rgba(255,0,0,0.2); color: #fff; border-color: red; }
+
+        /* Main Chat Area */
+        .main-chat { flex: 1; display: flex; flex-direction: column; background: var(--bg-chat); }
+        .chat-header {
+            padding: 15px; border-bottom: 1px solid var(--border); font-weight: bold;
+            display: flex; justify-content: space-between; align-items: center; height: 60px;
+        }
+        .call-controls { display: flex; gap: 10px; }
+        .call-btn {
+            background: var(--bg-input); border: none; color: var(--text-main);
+            padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 14px;
+        }
+        .call-btn:hover { background: #4e5058; color: #fff; }
+        .call-btn.active { background: var(--accent); color: #fff; }
+        
+        .messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .message { display: flex; gap: 10px; }
+        .msg-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: bold; color: #fff; }
+        .msg-content { flex: 1; }
+        .msg-header { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+        .msg-author { font-weight: bold; color: #fff; }
+        .msg-time { font-size: 12px; color: var(--text-muted); }
+        .msg-text { color: var(--text-main); line-height: 1.4; }
+        
+        .input-area { padding: 20px; display: flex; gap: 10px; }
+        .input-area input {
+            flex: 1; padding: 12px; border-radius: 8px; border: none;
+            background: var(--bg-input); color: var(--text-main); font-size: 16px;
+        }
+        .input-area input:focus { outline: none; }
+        .send-btn {
+            background: var(--accent); color: #fff; border: none; padding: 0 20px;
+            border-radius: 8px; cursor: pointer; font-weight: bold;
+        }
+        .send-btn:hover { background: var(--accent-hover); }
+    </style>
+</head>
+<body>
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen">
+        <!-- LOGIN -->
+        <div id="login-form" class="auth-box">
+            <h2>Welcome back!</h2>
+            <div id="login-error" class="error-msg"></div>
+            <input type="text" id="login-user" placeholder="Username" autocomplete="off">
+            <input type="password" id="login-pass" placeholder="Password">
+            <button onclick="doLogin()">Log In</button>
+            <div class="auth-links">
+                <a onclick="showForgot()">Forgot Password?</a>
+                <a onclick="showRegister()">Register</a>
+            </div>
+        </div>
+
+        <!-- REGISTER -->
+        <div id="register-form" class="auth-box hidden">
+            <h2>Create an Account</h2>
+            <div id="reg-error" class="error-msg"></div>
+            <input type="text" id="reg-user" placeholder="Username" autocomplete="off">
+            <input type="password" id="reg-pass" placeholder="Password">
+            <button onclick="doRegister()">Register</button>
+            <div class="auth-links" style="justify-content: center;">
+                <a onclick="showLogin()">Back to Login</a>
+            </div>
+        </div>
+
+        <!-- FORGOT PASSWORD -->
+        <div id="forgot-form" class="auth-box hidden">
+            <h2>Reset Password</h2>
+            <div id="forgot-error" class="error-msg"></div>
+            <input type="text" id="forgot-user" placeholder="Username" autocomplete="off">
+            <button onclick="doForgot()">Get Reset Token</button>
+            <div id="reset-section" class="hidden" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 15px;">
+                <input type="text" id="reset-token" placeholder="Paste Reset Token Here">
+                <input type="password" id="reset-newpass" placeholder="New Password">
+                <button onclick="doReset()">Reset Password</button>
+            </div>
+            <div class="auth-links" style="justify-content: center; margin-top: 10px;">
+                <a onclick="showLogin()">Back to Login</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHAT SCREEN -->
+    <div id="chat-screen" class="hidden">
+        <div class="sidebar">
+            <div class="sidebar-header">PyIM</div>
+            <div class="online-users" id="user-list">
+                <!-- Users injected here -->
+            </div>
+            <div class="user-bottom">
+                <span id="my-username" style="font-weight: bold;">Connecting...</span>
+                <button class="logout-btn" onclick="doLogout()">Logout</button>
+            </div>
+        </div>
+        <div class="main-chat">
+            <div class="chat-header">
+                <span id="chat-target">Select a user to chat</span>
+                <div class="call-controls" id="call-controls" style="display: none;">
+                    <button class="call-btn" onclick="startCall('audio')">🎤 Voice</button>
+                    <button class="call-btn" onclick="startCall('video')">📷 Video</button>
+                    <button class="call-btn" onclick="startCall('screen')">🖥️ Screen</button>
+                </div>
+            </div>
+            <div class="messages" id="messages-container">
+                <div style="text-align: center; color: var(--text-muted); margin-top: 50px;">
+                    Welcome to PyIM. Select a user from the sidebar to start messaging.
+                </div>
+            </div>
+            <div class="input-area">
+                <input type="text" id="msg-input" placeholder="Message..." disabled onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button class="send-btn" id="send-btn" disabled onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use 'wss://' if running on Fly.io, 'ws://' if testing locally
+        const WS_URL = window.location.protocol === 'https:' 
+            ? 'wss://python-instant-messenger-revive.fly.dev/ws' 
+            : 'ws://127.0.0.1:8080/ws';
+            
+        let ws = null;
+        let currentUser = null;
+        let currentTarget = null;
+        let onlineUsers = new Set();
+
+        // --- AUTHENTICATION ---
+        const errorMsgs = {
+            "username_taken": "That username is already taken.",
+            "invalid_credentials": "Incorrect username or password.",
+            "invalid_token": "That reset token is invalid.",
+            "token_expired": "The reset token has expired."
+        };
+
+        function showError(id, code) {
+            const el = document.getElementById(id);
+            el.innerText = errorMsgs[code] || code || "An error occurred.";
+        }
+
+        function showLogin() {
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('forgot-form').classList.add('hidden');
+        }
+
+        function showRegister() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+            document.getElementById('forgot-form').classList.add('hidden');
+        }
+
+        function showForgot() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('forgot-form').classList.remove('hidden');
+        }
+
+        async function doLogin() {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            if (!user || !pass) return;
+
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, password: pass})
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+                connectWebSocket(user, pass);
+            } else {
+                showError('login-error', data.code);
+            }
+        }
+
+        async function doRegister() {
+            const user = document.getElementById('reg-user').value;
+            const pass = document.getElementById('reg-pass').value;
+            if (!user || !pass) return;
+
+            const res = await fetch('/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, password: pass})
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+                // Auto login after register
+                document.getElementById('login-user').value = user;
+                document.getElementById('login-pass').value = pass;
+                doLogin();
+            } else {
+                showError('reg-error', data.code);
+            }
+        }
+
+        async function doForgot() {
+            const user = document.getElementById('forgot-user').value;
+            if (!user) return;
+
+            const res = await fetch('/forgot-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user})
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+                if (data.reset_token) {
+                    document.getElementById('reset-token').value = data.reset_token;
+                    document.getElementById('reset-section').classList.remove('hidden');
+                } else {
+                    showError('forgot-error', "If this account exists, a token was generated (check email later).");
+                }
+            } else {
+                showError('forgot-error', data.code);
+            }
+        }
+
+        async function doReset() {
+            const user = document.getElementById('forgot-user').value;
+            const token = document.getElementById('reset-token').value;
+            const newPass = document.getElementById('reset-newpass').value;
+            if (!user || !token || !newPass) return;
+
+            const res = await fetch('/reset-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, token: token, new_password: newPass})
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+                alert("Password reset successfully! You can now log in.");
+                showLogin();
+            } else {
+                showError('forgot-error', data.code);
+            }
+        }
+
+        // --- WEBSOCKET & CHAT ---
+        function connectWebSocket(user, pass) {
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({type: "login", user: user, pass: pass}));
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                
+                if (msg.type === "welcome") {
+                    currentUser = msg.user;
+                    document.getElementById('auth-screen').classList.add('hidden');
+                    document.getElementById('chat-screen').classList.remove('hidden');
+                    document.getElementById('my-username').innerText = currentUser;
+                } 
+                else if (msg.type === "error") {
+                    showError('login-error', msg.code);
+                    ws.close();
+                }
+                else if (msg.type === "presence") {
+                    if (msg.status === "online") {
+                        onlineUsers.add(msg.user);
+                    } else {
+                        onlineUsers.delete(msg.user);
+                    }
+                    renderUserList();
+                }
+                else if (msg.type === "msg") {
+                    if (msg.from === currentTarget) {
+                        appendMessage(msg.from, msg.body, new Date(msg.ts * 1000));
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                if (currentUser) {
+                    alert("Disconnected from server.");
+                    window.location.reload();
+                }
+            };
+        }
+
+        function renderUserList() {
+            const container = document.getElementById('user-list');
+            container.innerHTML = '';
+            
+            onlineUsers.forEach(user => {
+                if (user === currentUser) return;
+                const div = document.createElement('div');
+                div.className = 'user-item' + (user === currentTarget ? ' active' : '');
+                div.onclick = () => selectUser(user);
+                div.innerHTML = `<div class="status-dot"></div> ${user}`;
+                container.appendChild(div);
+            });
+
+            if (container.innerHTML === '') {
+                container.innerHTML = '<div style="color: var(--text-muted); font-size: 14px; padding: 10px;">No other users online.</div>';
+            }
+        }
+
+        function selectUser(user) {
+            currentTarget = user;
+            document.getElementById('chat-target').innerText = `Chatting with ${user}`;
+            document.getElementById('call-controls').style.display = 'flex';
+            document.getElementById('msg-input').disabled = false;
+            document.getElementById('send-btn').disabled = false;
+            document.getElementById('msg-input').focus();
+            
+            document.getElementById('messages-container').innerHTML = '';
+            renderUserList();
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const body = input.value.trim();
+            if (!body || !currentTarget) return;
+
+            const id = Date.now().toString();
+            const ts = Math.floor(Date.now() / 1000);
+
+            ws.send(JSON.stringify({
+                type: "msg",
+                to: currentTarget,
+                id: id,
+                body: body,
+                ts: ts
+            }));
+
+            appendMessage(currentUser, body, new Date());
+            input.value = '';
+        }
+
+        function appendMessage(author, text, date) {
+            const container = document.getElementById('messages-container');
+            
+            // Clear the "welcome" placeholder if it exists
+            if (container.children.length === 1 && container.children[0].style.textAlign === 'center') {
+                container.innerHTML = '';
+            }
+
+            const timeStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.innerHTML = `
+                <div class="msg-avatar">${author.charAt(0).toUpperCase()}</div>
+                <div class="msg-content">
+                    <div class="msg-header">
+                        <span class="msg-author">${author}</span>
+                        <span class="msg-time">${timeStr}</span>
+                    </div>
+                    <div class="msg-text">${escapeHtml(text)}</div>
+                </div>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function doLogout() {
+            if (ws) ws.close();
+            window.location.reload();
+        }
+
+        // --- WEBRTC STUBS ---
+        function startCall(type) {
+            alert(`Call type: ${type}\n\nWebRTC logic will be wired up here next!`);
+        }
+    </script>
+</body>
+</html>
