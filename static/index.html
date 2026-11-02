@@ -188,7 +188,7 @@
     <script>
         // Use 'wss://' if running on Fly.io, 'ws://' if testing locally
         const WS_URL = window.location.protocol === 'https:' 
-            ? 'wss://python-instant-messenger-revive.fly.dev/ws' 
+            ? `wss:/${window.location.host}/ws`
             : 'ws://127.0.0.1:8080/ws';
             
         let ws = null;
